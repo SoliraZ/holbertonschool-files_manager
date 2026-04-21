@@ -14,7 +14,19 @@ class RedisClient {
   }
 
   isAlive() {
-    return this.client.isOpen;
+    if (typeof this.client.isOpen === 'boolean') {
+      return this.client.isOpen;
+    }
+
+    if (typeof this.client.isReady === 'boolean') {
+      return this.client.isReady;
+    }
+
+    if (typeof this.client.connected === 'boolean') {
+      return this.client.connected;
+    }
+
+    return false;
   }
 
   async get(key) {
