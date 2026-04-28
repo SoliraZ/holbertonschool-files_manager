@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import dbClient from '../utils/db';
+import dbClientUtils from '../utils/db';
 
 class UsersController {
   static async postNew(req, res) {
@@ -13,7 +13,7 @@ class UsersController {
       return res.status(400).json({ error: 'Missing password' });
     }
 
-    const userCollection = dbClient.db.collection('users');
+    const userCollection = dbClientUtils.db.collection('users');
     const existingUser = await userCollection.findOne({ email });
 
     if (existingUser) {
