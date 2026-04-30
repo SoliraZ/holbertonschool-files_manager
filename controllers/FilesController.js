@@ -214,10 +214,6 @@ class FilesController {
         return res.status(404).json({ error: 'Not found' });
       }
 
-      if (fileDocument.type === 'folder') {
-        return res.status(400).json({ error: "A folder doesn't have content" });
-      }
-
       let authenticatedUserId = null;
       const token = req.header('X-Token');
       if (token) {
@@ -227,6 +223,10 @@ class FilesController {
       const ownerId = fileDocument.userId ? fileDocument.userId.toString() : null;
       if (!fileDocument.isPublic && authenticatedUserId !== ownerId) {
         return res.status(404).json({ error: 'Not found' });
+      }
+
+      if (fileDocument.type === 'folder') {
+        return res.status(400).json({ error: "A folder doesn't have content" });
       }
 
       if (!fileDocument.localPath) {
