@@ -137,18 +137,22 @@ class FilesController {
       const parentId = req.query.parentId || '0';
       const page = Number(req.query.page || 0);
       const pagination = Number.isNaN(page) || page < 0 ? 0 : page;
+      let parentFilter = { $in: [0, '0'] };
+      if (parentId !== '0') {
+        if (ObjectId.isValid(parentId)) {
+          parentFilter = { $in: [parentId, new ObjectId(parentId)] };
+        } else {
+          parentFilter = parentId;
+        }
+      }
 
-      const parentFilter = parentId === '0' ? { $in: [0, '0'] } : parentId;
-      const files = await dbClientUtils.db.collection('files').aggregate([
-        {
-          $match: {
-            userId: new ObjectId(userId),
-            parentId: parentFilter,
-          },
-        },
-        { $skip: pagination * 20 },
-        { $limit: 20 },
-      ]).toArray();
+      const files = await dbClientUtils.db.collection('files').find({
+        userId: new ObjectId(userId),
+        parentId: parentFilter,
+      })
+        .skip(pagination * 20)
+        .limit(20)
+        .toArray();
 
       return res.status(200).json(files.map((file) => FilesController.formatFile(file)));
     } catch (error) {
