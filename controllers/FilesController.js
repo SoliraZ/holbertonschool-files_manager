@@ -159,6 +159,44 @@ class FilesController {
       return res.status(500).json({ error: 'Internal error' });
     }
   }
+
+  static async updateFileVisibility(req, res, isPublic) {
+    try {
+      const token = req.header('X-Token');
+      const userId = await redisClientUtils.get(`auth_${token}`);
+
+      if (!userId || !ObjectId.isValid(userId)) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const fileId = req.params.id;
+      if (!ObjectId.isValid(fileId)) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      const fileCollection = dbClientUtils.db.collection('files');
+      const query = { _id: new ObjectId(fileId), userId: new ObjectId(userId) };
+      const fileDocument = await fileCollection.findOne(query);
+
+      if (!fileDocument) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      await fileCollection.updateOne(query, { $set: { isPublic } });
+      fileDocument.isPublic = isPublic;
+      return res.status(200).json(FilesController.formatFile(fileDocument));
+    } catch (error) {
+      return res.status(500).json({ error: 'Internal error' });
+    }
+  }
+
+  static async putPublish(req, res) {
+    return FilesController.updateFileVisibility(req, res, true);
+  }
+
+  static async putUnpublish(req, res) {
+    return FilesController.updateFileVisibility(req, res, false);
+  }
 }
 
 export default FilesController;
