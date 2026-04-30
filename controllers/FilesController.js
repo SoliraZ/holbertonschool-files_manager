@@ -4,6 +4,7 @@ import mime from 'mime-types';
 import mongodb from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
 import dbClientUtils from '../utils/db';
+import fileQueueUtils from '../utils/fileQueue';
 import redisClientUtils from '../utils/redis';
 
 const { ObjectId } = mongodb;
@@ -86,9 +87,14 @@ class FilesController {
     }
 
     const result = await dbClientUtils.db.collection('files').insertOne(fileDocument);
+    const fileId = result.insertedId.toString();
+
+    if (type === 'image') {
+      await fileQueueUtils.add({ userId, fileId });
+    }
 
     return res.status(201).json({
-      id: result.insertedId.toString(),
+      id: fileId,
       userId,
       name,
       type,
@@ -233,9 +239,15 @@ class FilesController {
         return res.status(404).json({ error: 'Not found' });
       }
 
+      const { size } = req.query;
+      let filePath = fileDocument.localPath;
+      if (size && ['500', '250', '100'].includes(size)) {
+        filePath = `${fileDocument.localPath}_${size}`;
+      }
+
       let fileContent;
       try {
-        fileContent = await fs.readFile(fileDocument.localPath);
+        fileContent = await fs.readFile(filePath);
       } catch (error) {
         return res.status(404).json({ error: 'Not found' });
       }
