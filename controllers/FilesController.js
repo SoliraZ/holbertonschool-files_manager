@@ -8,6 +8,17 @@ import redisClientUtils from '../utils/redis';
 const { ObjectId } = mongodb;
 
 class FilesController {
+  static formatFile(fileDocument) {
+    return {
+      id: fileDocument._id.toString(),
+      userId: fileDocument.userId.toString(),
+      name: fileDocument.name,
+      type: fileDocument.type,
+      isPublic: fileDocument.isPublic,
+      parentId: fileDocument.parentId,
+    };
+  }
+
   static async postUpload(req, res) {
     const token = req.header('X-Token');
     const userId = await redisClientUtils.get(`auth_${token}`);
@@ -83,6 +94,57 @@ class FilesController {
       isPublic,
       parentId,
     });
+  }
+
+  static async getShow(req, res) {
+    const token = req.header('X-Token');
+    const userId = await redisClientUtils.get(`auth_${token}`);
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const fileId = req.params.id;
+    if (!ObjectId.isValid(fileId)) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    const fileDocument = await dbClientUtils.db.collection('files').findOne({
+      _id: new ObjectId(fileId),
+      userId: new ObjectId(userId),
+    });
+
+    if (!fileDocument) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    return res.status(200).json(FilesController.formatFile(fileDocument));
+  }
+
+  static async getIndex(req, res) {
+    const token = req.header('X-Token');
+    const userId = await redisClientUtils.get(`auth_${token}`);
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const parentId = req.query.parentId || 0;
+    const page = Number(req.query.page || 0);
+    const pagination = Number.isNaN(page) || page < 0 ? 0 : page;
+
+    const files = await dbClientUtils.db.collection('files').aggregate([
+      {
+        $match: {
+          userId: new ObjectId(userId),
+          parentId,
+        },
+      },
+      { $skip: pagination * 20 },
+      { $limit: 20 },
+    ]).toArray();
+
+    return res.status(200).json(files.map((file) => FilesController.formatFile(file)));
   }
 }
 
