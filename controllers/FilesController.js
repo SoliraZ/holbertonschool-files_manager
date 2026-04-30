@@ -97,54 +97,63 @@ class FilesController {
   }
 
   static async getShow(req, res) {
-    const token = req.header('X-Token');
-    const userId = await redisClientUtils.get(`auth_${token}`);
+    try {
+      const token = req.header('X-Token');
+      const userId = await redisClientUtils.get(`auth_${token}`);
 
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      if (!userId || !ObjectId.isValid(userId)) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const fileId = req.params.id;
+      if (!ObjectId.isValid(fileId)) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      const fileDocument = await dbClientUtils.db.collection('files').findOne({
+        _id: new ObjectId(fileId),
+        userId: new ObjectId(userId),
+      });
+
+      if (!fileDocument) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      return res.status(200).json(FilesController.formatFile(fileDocument));
+    } catch (error) {
+      return res.status(500).json({ error: 'Internal error' });
     }
-
-    const fileId = req.params.id;
-    if (!ObjectId.isValid(fileId)) {
-      return res.status(404).json({ error: 'Not found' });
-    }
-
-    const fileDocument = await dbClientUtils.db.collection('files').findOne({
-      _id: new ObjectId(fileId),
-      userId: new ObjectId(userId),
-    });
-
-    if (!fileDocument) {
-      return res.status(404).json({ error: 'Not found' });
-    }
-
-    return res.status(200).json(FilesController.formatFile(fileDocument));
   }
 
   static async getIndex(req, res) {
-    const token = req.header('X-Token');
-    const userId = await redisClientUtils.get(`auth_${token}`);
+    try {
+      const token = req.header('X-Token');
+      const userId = await redisClientUtils.get(`auth_${token}`);
 
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+      if (!userId || !ObjectId.isValid(userId)) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
 
-    const parentId = req.query.parentId || 0;
-    const page = Number(req.query.page || 0);
-    const pagination = Number.isNaN(page) || page < 0 ? 0 : page;
+      const parentId = req.query.parentId || '0';
+      const page = Number(req.query.page || 0);
+      const pagination = Number.isNaN(page) || page < 0 ? 0 : page;
 
-    const files = await dbClientUtils.db.collection('files').aggregate([
-      {
-        $match: {
-          userId: new ObjectId(userId),
-          parentId,
+      const parentFilter = parentId === '0' ? { $in: [0, '0'] } : parentId;
+      const files = await dbClientUtils.db.collection('files').aggregate([
+        {
+          $match: {
+            userId: new ObjectId(userId),
+            parentId: parentFilter,
+          },
         },
-      },
-      { $skip: pagination * 20 },
-      { $limit: 20 },
-    ]).toArray();
+        { $skip: pagination * 20 },
+        { $limit: 20 },
+      ]).toArray();
 
-    return res.status(200).json(files.map((file) => FilesController.formatFile(file)));
+      return res.status(200).json(files.map((file) => FilesController.formatFile(file)));
+    } catch (error) {
+      return res.status(500).json({ error: 'Internal error' });
+    }
   }
 }
 
